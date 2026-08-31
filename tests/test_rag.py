@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 import types
@@ -19,6 +20,7 @@ from src.rag import (
 from src.rag.chroma_metadata import chroma_where, chunk_to_chroma_metadata, tag_flag_key
 from src.rag import demo
 from src.rag.demo import DEMO_QUERIES, create_parser, prompt_for_query, select_query
+from src.contracts.retrieval_text import build_e5_passage
 
 
 def make_chunk(chunk_id: str, content: str, use_cases: tuple[str, ...]) -> DocumentChunk:
@@ -34,6 +36,7 @@ def make_chunk(chunk_id: str, content: str, use_cases: tuple[str, ...]) -> Docum
         license="CC BY-SA 4.0",
         use_cases=use_cases,
         official_verified=True,
+        quality_status="approved",
     )
 
 
@@ -277,13 +280,15 @@ def test_chroma_metadata_and_where_include_tag_filters() -> None:
     )
     assert where is not None
     assert where["$and"][0] == {"official_verified": True}
-    assert {tag_flag_key("product_models", "Raspberry Pi 5"): True} in where["$and"][1]["$or"]
-    assert {tag_flag_key("use_cases", "camera"): True} in where["$and"][2]["$or"]
+    assert where["$and"][1] == {"quality_status": "approved"}
+    assert {tag_flag_key("product_models", "Raspberry Pi 5"): True} in where["$and"][2]["$or"]
+    assert {tag_flag_key("use_cases", "camera"): True} in where["$and"][3]["$or"]
 
     document_where = chroma_where(RagFilters(document_ids=("doc-pi5", "doc-zero")))
     assert document_where == {
         "$and": [
             {"official_verified": True},
+            {"quality_status": "approved"},
             {"document_id": {"$in": ["doc-pi5", "doc-zero"]}},
         ]
     }
@@ -300,6 +305,8 @@ def test_dense_configuration_error_is_not_silently_hidden(monkeypatch) -> None:
 
 def test_indexer_reset_deletes_existing_collection_and_writes_scalar_metadata(tmp_path, monkeypatch) -> None:
     manifest_path = tmp_path / "manifest.json"
+    passage = build_e5_passage(title="Camera", section="Setup", content="camera setup")
+    embedding_checksum = f"sha256:{hashlib.sha256(passage.encode('utf-8')).hexdigest()}"
     manifest_path.write_text(
         json.dumps(
             {
@@ -310,14 +317,17 @@ def test_indexer_reset_deletes_existing_collection_and_writes_scalar_metadata(tm
                         "title": "Camera",
                         "section": "Setup",
                         "content": "camera setup",
-                        "source_url": "https://www.raspberrypi.com/documentation/",
-                        "retrieved_at": "2026-08-28",
+                            "source_url": "https://www.raspberrypi.com/documentation/",
+                            "source_anchor": None,
+                            "retrieved_at": "2026-08-28",
                         "document_version": None,
                         "license": "CC BY-SA 4.0",
                         "product_models": ["Raspberry Pi 5"],
                         "use_cases": ["camera"],
                         "os_versions": ["Raspberry Pi OS"],
-                        "official_verified": True,
+                            "official_verified": True,
+                            "quality_status": "approved",
+                            "embedding_checksum": embedding_checksum,
                     }
                 ]
             }
@@ -331,6 +341,12 @@ def test_indexer_reset_deletes_existing_collection_and_writes_scalar_metadata(tm
 
         def upsert(self, **kwargs: object) -> None:
             self.upserted = kwargs
+
+        def get(self) -> dict[str, list[str]]:
+            return {"ids": []}
+
+        def delete(self, *, ids: list[str]) -> None:
+            raise AssertionError(f"unexpected stale IDs: {ids}")
 
     class FakeClient:
         def __init__(self) -> None:
@@ -352,7 +368,7 @@ def test_indexer_reset_deletes_existing_collection_and_writes_scalar_metadata(tm
             assert name == "test-e5"
 
         def encode(self, texts: list[str], normalize_embeddings: bool) -> list[list[float]]:
-            assert texts == ["passage: camera setup"]
+            assert texts == [passage]
             assert normalize_embeddings is True
             return [[0.1, 0.2]]
 

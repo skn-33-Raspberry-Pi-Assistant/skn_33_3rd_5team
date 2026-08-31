@@ -391,8 +391,10 @@ class CatalogToRagTests(unittest.TestCase):
             indexed_at=datetime.fromisoformat("2026-08-30T12:00:00+00:00"),
             document_checksum="sha256:document",
             chunk_checksum="sha256:chunk",
+            embedding_checksum="sha256:embedding",
             parser_version="test",
             official_verified=True,
+            quality_status="approved",
             product_models=("Compact Board",),
             use_cases=("gpio_iot",),
             tasks=("sensor_monitoring",),
@@ -475,6 +477,33 @@ class CatalogToRagTests(unittest.TestCase):
         self.assertEqual(retriever.filters.document_ids, ("doc-compact", "doc-fast"))
         self.assertIn("Compact Board", retriever.query)
         self.assertIn("trace.citation_validation=passed", response.warnings)
+
+    def test_streamlit_form_entrypoint_preserves_explicit_widget_values(self):
+        """Streamlit 전용 진입점이 명시적 위젯값을 최종 응답에 유지한다."""
+
+        retriever = self.StaticRetriever(
+            RetrievalDecision(status="retrieved", results=(self._result(),))
+        )
+        form = RecommendationFormInput.from_widget_values(
+            request_id="streamlit-form-1",
+            free_text="센서 모니터링에 쓸 작은 보드를 추천해줘",
+            user_level_label="입문자",
+            performance_priority_label="보통",
+            wireless_required=True,
+            camera_required=False,
+            gpio_required=True,
+            monitor_absent=True,
+        )
+
+        response = self._service(retriever).answer_form(form=form, trace=True)
+
+        self.assertEqual(response.status, "answered")
+        self.assertEqual(response.request_id, form.request_id)
+        self.assertEqual(response.conditions.user_level, "beginner")
+        self.assertEqual(response.conditions.performance_priority, "medium")
+        self.assertTrue(response.conditions.wireless_required)
+        self.assertTrue(response.conditions.gpio_required)
+        self.assertFalse(response.conditions.monitor_available)
 
     def test_insufficient_catalog_evidence_skips_answer_generator(self):
         class SpyGenerator(EvidenceTemplateGenerator):

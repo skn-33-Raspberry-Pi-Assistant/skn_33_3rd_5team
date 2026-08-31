@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Literal, Mapping, Protocol, Sequence
 
+from src.condition_extraction.ui_input import RecommendationFormInput
 from src.condition_extraction.schema import SurveyAnswer, SurveyResponse
 from src.contracts import ChatResponse, ConditionPayload
 from src.lang import (
@@ -163,8 +164,15 @@ class RecommendationRagService:
         request_id: str,
         question: str,
         trace: bool = False,
+        form: RecommendationFormInput | None = None,
     ) -> ChatResponse:
         """자유 입력을 조건 추출부터 인용 포함 제품 추천까지 처리한다."""
+
+        if form is not None:
+            if form.request_id != request_id:
+                raise ValueError("form.request_id must match request_id.")
+            if form.free_text != question:
+                raise ValueError("form.free_text must match question.")
 
         request_decision = evaluate_request(question)
         if not request_decision.allowed:
@@ -179,7 +187,11 @@ class RecommendationRagService:
             )
 
         try:
-            agent_result = self.recommendation_agent.recommend(self._survey(question))
+            agent_result = (
+                self.recommendation_agent.recommend_form(form)
+                if form is not None
+                else self.recommendation_agent.recommend(self._survey(question))
+            )
         except Exception as exc:
             return self._response(
                 request_id=request_id,
@@ -381,6 +393,21 @@ class RecommendationRagService:
                     else []
                 ),
             ],
+        )
+
+    def answer_form(
+        self,
+        *,
+        form: RecommendationFormInput,
+        trace: bool = False,
+    ) -> ChatResponse:
+        """Streamlit 입력의 명시적 위젯값을 우선해 추천한다."""
+
+        return self.answer(
+            request_id=form.request_id,
+            question=form.free_text,
+            trace=trace,
+            form=form,
         )
 
 

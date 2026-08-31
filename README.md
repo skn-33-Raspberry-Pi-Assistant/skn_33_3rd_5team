@@ -492,7 +492,7 @@ Streamlit 화면에 RAG·sLLM 로직을 직접 작성하지 않고 src/services/
 ## 설치 및 실행
 
 > [!NOTE]
-> 현재 Streamlit 화면은 sLLM·RAG 연동 전 UI 검증을 위한 mock 버전입니다. 제품 추천, 조건 JSON, 한국어 QA 답변, 답변 보류, 공식 문서 출처 화면을 미리 확인할 수 있습니다.
+> Streamlit은 `src/services/`의 실제 QA·제품 추천 서비스와 `ChatResponse 1.1.0`으로 연결됩니다. `.env`, 정식 manifest, Chroma 색인 또는 모델 어댑터가 없으면 mock 결과를 보여 주지 않고 화면에 준비 필요 상태를 표시합니다.
 
 ### 현재 RAG QA 실행 기준
 
@@ -512,7 +512,7 @@ python3 -m src.services.rag_qa_cli
 python3 -m src.services.rag_qa_cli --query "SSH를 활성화하려면?" --trace
 ```
 
-예정된 챗봇 실행 흐름은 다음과 같습니다.
+챗봇 실행 흐름은 다음과 같습니다.
 
 ```bash
 git clone <PROJECT_REPOSITORY_URL>
@@ -523,7 +523,7 @@ python -m pip install -r requirements.txt
 streamlit run streamlit_app/app.py
 ```
 
-브라우저에서 제품 추천과 질의응답 탭을 전환할 수 있습니다. Streamlit 실행 파일, mock 응답, 화면 스타일은 `streamlit_app/` 디렉터리에서 함께 관리합니다. 실제 연동 시 UI 코드에 모델·검색 로직을 직접 추가하지 않고 `src/services/`의 공통 응답으로 mock 데이터를 교체합니다.
+브라우저에서 제품 추천과 질의응답 탭을 전환할 수 있습니다. `streamlit_app/runtime.py`가 CLI와 동일한 설정으로 서비스를 조립하고, 화면은 검증된 응답·제품·인용 계약만 표시합니다. 최신 Streamlit 통합 검증 결과와 남은 준비물은 [`docs/validation/2026-08-31-streamlit-integration.md`](docs/validation/2026-08-31-streamlit-integration.md)에서 확인합니다.
 
 조건 추출기는 환경변수로 교체할 수 있게 구성합니다.
 

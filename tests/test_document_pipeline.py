@@ -99,8 +99,10 @@ def test_manifest_adapter_maps_collected_at_without_dropping_manifest_contract()
             "os_versions": ["Raspberry Pi OS"],
             "document_checksum": "sha256:" + "a" * 64,
             "chunk_checksum": "sha256:" + "b" * 64,
+            "embedding_checksum": "sha256:" + "c" * 64,
             "parser_version": "asciidoc-semantic-2.0.0",
             "official_verified": True,
+            "quality_status": "approved",
             "image_url": None,
             "video_url": None,
         }
